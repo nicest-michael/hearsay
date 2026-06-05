@@ -1,0 +1,34 @@
+=== spike started Fri Jun  5 18:39:59 EDT 2026 ===
+[spike] device=mps torch=2.4.0
+ckpt path or config path does not exist! Downloading the model from the Hugging Face Hub...
+Fetching 13 files:   0%|          | 0/13 [00:00<?, ?it/s]Fetching 13 files:   8%|▊         | 1/13 [00:00<00:01,  6.51it/s]Fetching 13 files:  15%|█▌        | 2/13 [00:00<00:01,  6.92it/s]Fetching 13 files:  23%|██▎       | 3/13 [00:00<00:02,  3.82it/s]Fetching 13 files:  46%|████▌     | 6/13 [00:01<00:01,  5.08it/s]Fetching 13 files:  85%|████████▍ | 11/13 [00:01<00:00, 10.75it/s]Fetching 13 files: 100%|██████████| 13/13 [00:01<00:00,  9.83it/s]
+/Users/michael/Repos/hearsay/vendor/MisoTTS/.venv/lib/python3.10/site-packages/silentcipher/server.py:463: FutureWarning: You are using `torch.load` with `weights_only=False` (the current default value), which uses the default pickle module implicitly. It is possible to construct malicious pickle data which will execute arbitrary code during unpickling (See https://github.com/pytorch/pytorch/blob/main/SECURITY.md#untrusted-models for more details). In a future release, the default value for `weights_only` will be flipped to `True`. This limits the functions that could be executed during unpickling. Arbitrary objects will no longer be allowed to be loaded via this mode unless they are explicitly allowlisted by the user via `torch.serialization.add_safe_globals`. We recommend you start setting `weights_only=True` for any use case where you don't have full control of the loaded file. Please open an issue on GitHub for any issues related to this experimental feature.
+  self.enc_c.load_state_dict(self.convert_dataparallel_to_normal(torch.load(os.path.join(ckpt_dir, "enc_c.ckpt"), map_location=self.device)))
+/Users/michael/Repos/hearsay/vendor/MisoTTS/.venv/lib/python3.10/site-packages/silentcipher/server.py:464: FutureWarning: You are using `torch.load` with `weights_only=False` (the current default value), which uses the default pickle module implicitly. It is possible to construct malicious pickle data which will execute arbitrary code during unpickling (See https://github.com/pytorch/pytorch/blob/main/SECURITY.md#untrusted-models for more details). In a future release, the default value for `weights_only` will be flipped to `True`. This limits the functions that could be executed during unpickling. Arbitrary objects will no longer be allowed to be loaded via this mode unless they are explicitly allowlisted by the user via `torch.serialization.add_safe_globals`. We recommend you start setting `weights_only=True` for any use case where you don't have full control of the loaded file. Please open an issue on GitHub for any issues related to this experimental feature.
+  self.dec_c.load_state_dict(self.convert_dataparallel_to_normal(torch.load(os.path.join(ckpt_dir, "dec_c.ckpt"), map_location=self.device)))
+/Users/michael/Repos/hearsay/vendor/MisoTTS/.venv/lib/python3.10/site-packages/silentcipher/server.py:466: FutureWarning: You are using `torch.load` with `weights_only=False` (the current default value), which uses the default pickle module implicitly. It is possible to construct malicious pickle data which will execute arbitrary code during unpickling (See https://github.com/pytorch/pytorch/blob/main/SECURITY.md#untrusted-models for more details). In a future release, the default value for `weights_only` will be flipped to `True`. This limits the functions that could be executed during unpickling. Arbitrary objects will no longer be allowed to be loaded via this mode unless they are explicitly allowlisted by the user via `torch.serialization.add_safe_globals`. We recommend you start setting `weights_only=True` for any use case where you don't have full control of the loaded file. Please open an issue on GitHub for any issues related to this experimental feature.
+  m.load_state_dict(self.convert_dataparallel_to_normal(torch.load(os.path.join(ckpt_dir, f"dec_m_{i}.ckpt"), map_location=self.device)))
+[spike] model loaded in 532.7s  sample_rate=24000  rss=12.0GB
+[spike] moved Mimi codec -> CPU
+[spike] warmup...
+[spike] warmup done, rss=12.0GB
+
+[spike] text="Hey, what's up?"
+        frames=15  audio=1.20s  gen=12.18s  RTF=10.15  median_frame=753ms  first_audio~9.17s  mimi_decode=33ms
+Traceback (most recent call last):
+  File "/Users/michael/Repos/hearsay/vendor/MisoTTS/../../scripts/spike_miso.py", line 111, in <module>
+    main()
+  File "/Users/michael/Repos/hearsay/vendor/MisoTTS/../../scripts/spike_miso.py", line 102, in main
+    torchaudio.save(fn, audio.unsqueeze(0).cpu().float(), gen.sample_rate)
+  File "/Users/michael/Repos/hearsay/vendor/MisoTTS/.venv/lib/python3.10/site-packages/torchaudio/_backend/utils.py", line 313, in save
+    return backend.save(
+  File "/Users/michael/Repos/hearsay/vendor/MisoTTS/.venv/lib/python3.10/site-packages/torchaudio/_backend/soundfile.py", line 44, in save
+    soundfile_backend.save(
+  File "/Users/michael/Repos/hearsay/vendor/MisoTTS/.venv/lib/python3.10/site-packages/torchaudio/_backend/soundfile_backend.py", line 457, in save
+    soundfile.write(file=filepath, data=src, samplerate=sample_rate, subtype=subtype, format=format)
+  File "/Users/michael/Repos/hearsay/vendor/MisoTTS/.venv/lib/python3.10/site-packages/soundfile.py", line 358, in write
+    data = np.asarray(data)
+  File "/Users/michael/Repos/hearsay/vendor/MisoTTS/.venv/lib/python3.10/site-packages/torch/_tensor.py", line 1083, in __array__
+    return self.numpy()
+RuntimeError: Can't call numpy() on Tensor that requires grad. Use tensor.detach().numpy() instead.
+=== spike exit 1 Fri Jun  5 18:49:23 EDT 2026 ===
