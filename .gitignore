@@ -1,0 +1,8 @@
+vendor/MisoTTS/.venv/
+vendor/MisoTTS/**/__pycache__/
+**/__pycache__/
+target/
+web/node_modules/
+web/dist/
+*.wav
+.DS_Store
