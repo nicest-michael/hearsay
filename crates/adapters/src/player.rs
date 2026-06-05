@@ -14,6 +14,7 @@
 //! - `consumed` — samples removed from the ring (played or flush-drained).
 //! - `delivered` — real samples actually written to the device (excludes underrun
 //!   silence and flush-discarded), i.e. "how much of the agent did the user hear".
+//!
 //! `is_draining` = `enqueued > consumed`. `played_samples` = `delivered`.
 
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};

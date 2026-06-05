@@ -55,8 +55,18 @@ def main():
     srv = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
     srv.bind(SOCK)
     srv.listen(1)
-    conn, _ = srv.accept()
 
+    # Serve connections in a loop so the model stays warm across Stop/Go: each Go
+    # opens a fresh connection; a disconnect just returns us to accept().
+    while True:
+        conn, _ = srv.accept()
+        if serve_connection(conn, model, sr):
+            break  # shutdown requested
+    os._exit(0)
+
+
+def serve_connection(conn, model, sr):
+    """Serve one client until it disconnects. Returns True if shutdown was requested."""
     rf = conn.makefile("rb")
     wf = conn.makefile("wb")
     lock = threading.Lock()
@@ -93,9 +103,10 @@ def main():
             elif t == "shutdown":
                 with cv:
                     state["shutdown"] = True
+                    state["explicit_shutdown"] = True
                     cv.notify()
                 return
-        # EOF -> client gone
+        # EOF -> client disconnected (Stop). End this connection but stay warm.
         with cv:
             state["shutdown"] = True
             cv.notify()
@@ -128,8 +139,9 @@ def main():
 
     try:
         conn.close()
-    finally:
-        os._exit(0)
+    except Exception:
+        pass
+    return bool(state.get("explicit_shutdown"))
 
 
 if __name__ == "__main__":
