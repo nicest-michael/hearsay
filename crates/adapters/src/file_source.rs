@@ -56,7 +56,7 @@ impl FileAudioSource {
         };
 
         let silence = (TARGET_RATE as u64 * trailing_silence_ms as u64 / 1000) as usize;
-        samples.extend(std::iter::repeat(0.0).take(silence));
+        samples.resize(samples.len() + silence, 0.0);
 
         Ok(Self {
             samples,

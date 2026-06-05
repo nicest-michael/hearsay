@@ -58,8 +58,8 @@ fn main() {
     println!("[e2e] sweeping stale sidecars + starting fresh ones…");
     sweep_stale();
     std::thread::sleep(Duration::from_secs(1));
-    let _llm = Sidecar::mlx_llm(&root, LLM_MODEL, LLM_PORT).expect("spawn llm");
-    let _tts = Sidecar::kokoro(&root, TTS_SOCK, "af_heart").expect("spawn tts");
+    let llm_sc = Sidecar::mlx_llm(&root, LLM_MODEL, LLM_PORT).expect("spawn llm");
+    let tts_sc = Sidecar::kokoro(&root, TTS_SOCK, "af_heart").expect("spawn tts");
 
     let base = format!("http://127.0.0.1:{LLM_PORT}");
     println!("[e2e] waiting for LLM…");
@@ -177,5 +177,10 @@ No markdown or emoji."
         && !assistant_text.trim().is_empty()
         && samples.len() > 10_000;
     println!("VERDICT         : {}", if pass { "PASS" } else { "FAIL" });
+
+    // Drop the sidecars explicitly (process::exit would skip their Drop), so this
+    // harness leaves no model processes behind.
+    drop(llm_sc);
+    drop(tts_sc);
     std::process::exit(if pass { 0 } else { 1 });
 }

@@ -1457,6 +1457,7 @@ dependencies = [
  "crossbeam-channel",
  "hearsay-core",
  "hound",
+ "libc",
  "log",
  "rtrb",
  "serde",
