@@ -1,0 +1,14 @@
+[package]
+name = "hearsay-core"
+description = "Hearsay pure domain core + ports (no I/O dependencies)"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+# INTENTIONALLY has zero dependencies. The hexagon's dependency rule is
+# compile-enforced here: the domain physically cannot import cpal/whisper/reqwest.
+[dependencies]
+
+[lints.rust]
+unsafe_code = "forbid"

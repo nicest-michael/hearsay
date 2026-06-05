@@ -1,0 +1,28 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/core",
+    "crates/app",
+    "crates/adapters",
+    "crates/engine",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.94"
+license = "MIT"
+authors = ["Michael <michael@nicest.ai>"]
+
+[workspace.dependencies]
+hearsay-core = { path = "crates/core" }
+hearsay-app = { path = "crates/app" }
+hearsay-adapters = { path = "crates/adapters" }
+anyhow = "1"
+thiserror = "2"
+log = "0.4"
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 1

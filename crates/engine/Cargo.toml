@@ -1,0 +1,17 @@
+[package]
+name = "hearsay-engine"
+description = "Hearsay runtime: the conversation loop (STT -> LLM -> TTS -> playback) with barge-in, command/event types — shared by any UI shell"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+hearsay-core.workspace = true
+hearsay-app.workspace = true
+hearsay-adapters.workspace = true
+crossbeam-channel = "0.5"
+log.workspace = true
+
+[lints.rust]
+unsafe_code = "forbid"
