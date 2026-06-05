@@ -5,6 +5,16 @@ members = [
     "crates/app",
     "crates/adapters",
     "crates/engine",
+    "src-tauri",
+]
+# Bare `cargo build/test/clippy` operate on the default set, which excludes the Tauri
+# shell: `generate_context!` needs the frontend dist (release) or dev server, so it is
+# built only via the Tauri CLI / `make`, never bare cargo.
+default-members = [
+    "crates/core",
+    "crates/app",
+    "crates/adapters",
+    "crates/engine",
 ]
 
 [workspace.package]
@@ -18,6 +28,7 @@ authors = ["Michael <michael@nicest.ai>"]
 hearsay-core = { path = "crates/core" }
 hearsay-app = { path = "crates/app" }
 hearsay-adapters = { path = "crates/adapters" }
+hearsay-engine = { path = "crates/engine" }
 anyhow = "1"
 thiserror = "2"
 log = "0.4"

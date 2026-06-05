@@ -1,0 +1,26 @@
+[package]
+name = "hearsay-tauri"
+description = "Hearsay — Tauri desktop shell over the shared Rust conversation engine"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "hearsay-tauri"
+path = "src/main.rs"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+crossbeam-channel = "0.5"
+log = "0.4"
+env_logger = "0.11"
+directories = "6"
+hearsay-core.workspace = true
+hearsay-adapters.workspace = true
+hearsay-engine.workspace = true

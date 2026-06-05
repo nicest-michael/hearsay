@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- Merged into the Tauri-generated Info.plist. Only carries keys Tauri does not
+     set itself: the privacy usage strings macOS shows on the permission prompts.
+     (System-audio capture via ScreenCaptureKit is gated by the Screen Recording
+     TCC prompt at runtime, which needs no Info.plist string.) -->
+<plist version="1.0">
+<dict>
+    <key>NSMicrophoneUsageDescription</key>
+    <string>Hearsay listens to your voice on-device for a live conversation. Audio never leaves your Mac.</string>
+    <key>NSSpeechRecognitionUsageDescription</key>
+    <string>Hearsay transcribes audio locally with Whisper; no speech is sent to Apple.</string>
+    <key>NSHighResolutionCapable</key>
+    <true/>
+</dict>
+</plist>
