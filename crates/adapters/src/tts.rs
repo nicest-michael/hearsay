@@ -175,5 +175,6 @@ mod tests {
             .expect("speak");
         assert!(total > 10_000, "expected speech PCM, got {total} samples");
         let _ = child.kill();
+        let _ = child.wait(); // reap
     }
 }
