@@ -26,7 +26,14 @@ def main():
     print(f"[spike] device={dev} torch={torch.__version__}", flush=True)
     t0 = time.time()
     gen = load_miso_8b(device=dev, model_path_or_repo_id="MisoLabs/MisoTTS", dtype=torch.float16)
-    print(f"[spike] model loaded in {time.time()-t0:.1f}s  sample_rate={gen.sample_rate}  rss={rss_gb():.1f}GB", flush=True)
+    torch.set_grad_enabled(False)  # CRITICAL: no autograd graph during inference (was contaminating RTF)
+    pdtype = next(gen._model.parameters()).dtype
+    try:
+        cache_dev = gen._model.backbone_causal_mask.device
+    except Exception:
+        cache_dev = "?"
+    print(f"[spike] model loaded in {time.time()-t0:.1f}s  sample_rate={gen.sample_rate}  "
+          f"param_dtype={pdtype}  mask_device={cache_dev}  rss={rss_gb():.1f}GB", flush=True)
 
     # Move the Mimi codec + watermarker to CPU to avoid MPS float64 ops in the codec/DSP.
     try:
@@ -85,7 +92,6 @@ def main():
     tests = [
         "Hey, what's up?",
         "I can hear you loud and clear.",
-        "Honestly, that's a great question, and I think there's a lot to unpack there.",
     ]
     # warm up MPS kernels (first frame is always slow)
     print("[spike] warmup...", flush=True)
@@ -99,7 +105,7 @@ def main():
               f"RTF={s['rtf']:.2f}  median_frame={s['med_frame_ms']:.0f}ms  "
               f"first_audio~{(s['first_audio_s'] or 0):.2f}s  mimi_decode={s['dec_t']*1000:.0f}ms", flush=True)
         fn = f"/tmp/miso_spike_{abs(hash(t))%9999}.wav"
-        torchaudio.save(fn, audio.unsqueeze(0).cpu().float(), gen.sample_rate)
+        torchaudio.save(fn, audio.detach().unsqueeze(0).cpu().float(), gen.sample_rate)
         print(f"        wrote {fn}", flush=True)
 
     # cooperative-cancel probe: how fast does the loop stop?

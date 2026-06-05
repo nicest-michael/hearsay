@@ -8,20 +8,29 @@
 //! external audio/ML/network crates appear — the dependency rule keeps them out of
 //! the domain.
 
+pub mod llm;
 pub mod mic;
 pub mod models;
+pub mod player;
 pub mod resample;
+pub mod sidecar;
+pub mod tts;
 pub mod whisper;
 
+pub use llm::MlxChat;
 pub use mic::{list_input_devices, CpalMicSource, DeviceInfo};
 pub use models::{ensure_model, is_present, model_path, ModelError};
+pub use player::{CpalPlayer, SYNTH_RATE};
 pub use resample::Resampler16k;
+pub use sidecar::{sweep_stale, Sidecar};
+pub use tts::SidecarTts;
 pub use whisper::WhisperTranscriber;
 
-/// Compile-time proof the STT port impls satisfy the `Send` bound the worker threads
-/// require (they move to the aggregator/inference threads).
+/// Compile-time proof the port impls satisfy the `Send` bound the worker/engine
+/// threads require (they move across threads).
 const _: () = {
     fn assert_send<T: Send>() {}
     let _ = assert_send::<CpalMicSource>;
     let _ = assert_send::<WhisperTranscriber>;
+    let _ = assert_send::<CpalPlayer>;
 };

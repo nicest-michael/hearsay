@@ -15,8 +15,7 @@ cpal = "0.17.3"
 crossbeam-channel = "0.5.15"
 hound = "3.5.1"
 rtrb = "0.3.4"
-ringbuf = "0.4.7"
-ureq = "3.3.0"
+ureq = { version = "3.3.0", features = ["json"] }
 whisper-rs = { version = "0.16.0", features = ["metal"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
