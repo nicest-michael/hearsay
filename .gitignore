@@ -6,3 +6,4 @@ web/node_modules/
 web/dist/
 *.wav
 .DS_Store
+vendor/
