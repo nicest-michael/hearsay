@@ -29,6 +29,31 @@ These findings (from `/best-practice` research, 2026-06-05) are load-bearing. Do
 
 ---
 
+## Council Adjustments (2026-06-05, confidence HIGH)
+
+Codex + Gemini + GPT-5 reviewed this plan. They **validated** the architecture, the small-Qwen LLM choice, the FSM+turn-id barge-in, the hexagonal layering, and headphones-for-v1. They **sharpened the TTS strategy**. Folded in here; the rest of the plan stands.
+
+**Confirmed hard facts (from reading MisoTTS source + HF, post-plan):**
+- Per 80 ms audio frame (12.5 fps), `Model.generate_frame` (models.py:162) runs **ONE 8B-backbone decode + 31 sequential 300M-decoder decodes**. At fp16 on ~273 GB/s the 8B decode alone is ~60–90 ms, so **RTF is very likely 1.5–2.3×** — slower than real-time. Gemini's "physics" warning is correct.
+- Weights are a single **32.75 GB fp32** `model.safetensors` (ungated); load to CPU then cast → **~16 GB fp16** on MPS.
+- Tokenizer `meta-llama/Llama-3.2-1B` is **gated**; use ungated mirror `unsloth/Llama-3.2-1B` (identical Llama-3.2 vocab). Patched in `generator.py`.
+- `run_misotts.py` skips MPS "due to float64 limitations" → run the **transformer on MPS**, **Mimi codec + watermark on CPU** (dodges MPS float64). `PYTORCH_ENABLE_MPS_FALLBACK=1` as a backstop.
+
+**Adjustment A — RTF gate is strict; chunking is NOT a free pass (supersedes finding #3's "accept RTF > 1").** Because RTF > 1 means sentence N+1 isn't ready when N finishes (dead air between sentences), the design is:
+  - The sidecar streams **frame-chunked within a sentence** (decode + emit every ~12 frames ≈ 1 s) and the engine **pipelines** (synthesize the next chunk/sentence while the current plays).
+  - The persona system prompt **hard-constrains replies to 1–2 short sentences** ("a punchy conversational buddy — reply in one or two short sentences, never a monologue"). This is both the RTF mitigation (no long multi-sentence gap to expose) and the most natural barge-in banter style. Gemini's own dissent: at RTF ≤ ~1.8 a single short burst is fine.
+  - **Decision tree by measured RTF (Task 0):** `<0.8` → Miso, full pipelined streaming. `0.8–1.5` → Miso + terse persona + aggressive pipeline (the expected case). `>~2.5` (catastrophic) → fall back to **Kokoro via mlx-audio** (proven ~0.1× RTF on Apple Silicon, natural voice) behind the **same `SpeechSynthesizer` port** — no other code changes. Do NOT pursue an MLX/CSM port (separate multi-day research project); only escalate to it if measurement demands AND Kokoro is unacceptable.
+
+**Adjustment B — cooperative, in-frame TTS cancellation (first-class, not afterthought).** Killing the sidecar mid-inference can leave a Metal kernel running 1–3 s. So: playback flush (`player.barge_stop`) gives the **instant audible cut** (< ~150 ms), AND the sidecar checks the cancel flag **inside the per-frame loop** (between `generate_frame` calls) so the GPU frees within ~1 frame (~80 ms) and the next turn starts fast. The sidecar reimplements `generate()`'s loop (we have the source) to get both the per-frame cancel hook and frame-chunked streaming. (Task 6 updated.)
+
+**Adjustment C — sidecar lifecycle hardened beyond kill-on-Drop (Gemini).** `Drop` doesn't fire if Tauri panics/`SIGKILL`s → a 16 GB process leaks. So: (1) the Python sidecars poll `os.getppid()` and **self-exit when the parent dies** (ppid → 1); (2) on app **startup, sweep** and kill any stale `miso_tts_server.py` / `mlx_lm.server` from a prior crashed run; (3) spawn in the app's process group. This makes "don't leave models loaded" hold even across crashes. (Tasks 6, 7, 9 updated.)
+
+**Adjustment D — Stop keeps models WARM; free RAM on close/Quit/idle (GPT-5).** Killing 16 GB on every Stop means a ~3–5 s reload (M5 Pro NVMe) on the next Go. So **Stop** = stop listening, keep models warm for instant resume; the **idle timer keeps running** and the models are freed on window-close / Quit / **idle-timeout** (default ~5 min). Walking away still unloads — satisfying "don't leave it loaded" — without punishing a quick pause. (Task 9 updated.)
+
+**Adjustment E — verify in the spike that killing the process returns unified memory** (it should: process death frees MPS allocations; nothing persists cross-process). Spike also confirms the cooperative-cancel latency.
+
+---
+
 ## File Structure
 
 ```
@@ -130,9 +155,7 @@ While it runs, in another shell: `while true; do ps -o rss= -p $(pgrep -f spike_
 
 - [ ] **Step 5: Record verdict in the ADR**
 
-Capture: load time, `sample_rate`, RTF per sentence, **time-to-first-audio for the short sentence**, peak RSS. Listen to `/tmp/miso_*.wav` (it's the Miso voice — confirm quality). **Decision gate:**
-- RTF ≤ ~1.5 and first-audio ≤ ~2.5 s → proceed with MisoTTS as planned.
-- RTF much worse → keep MisoTTS but reduce: try fp16 everywhere, smaller `max_audio_length_ms`, sentence chunking; if still unusable, adopt the council's fallback (documented in ADR) behind the same `SpeechSynthesizer` port. The port boundary means the rest of the app is unaffected either way.
+Capture: load time, `sample_rate`, RTF per sentence, **time-to-first-audio for the short sentence**, peak RSS, and the cooperative-cancel latency. Listen to `/tmp/miso_spike_*.wav` (it's the Miso voice — confirm quality). Also confirm peak RSS drops to ~0 after the process exits (Adjustment E). **Decision gate = Council Adjustment A's RTF decision tree** (`<0.8` full streaming / `0.8–1.5` Miso+terse persona+pipeline / `>~2.5` Kokoro fallback). Record the measured RTF, first-audio, RSS, and the chosen branch in the ADR.
 
 - [ ] **Step 6: Commit the spike**
 ```bash
