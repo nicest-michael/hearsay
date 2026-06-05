@@ -8,6 +8,7 @@
 //! external audio/ML/network crates appear — the dependency rule keeps them out of
 //! the domain.
 
+pub mod file_source;
 pub mod llm;
 pub mod mic;
 pub mod models;
@@ -17,6 +18,7 @@ pub mod sidecar;
 pub mod tts;
 pub mod whisper;
 
+pub use file_source::FileAudioSource;
 pub use llm::MlxChat;
 pub use mic::{list_input_devices, CpalMicSource, DeviceInfo};
 pub use models::{ensure_model, is_present, model_path, ModelError};
