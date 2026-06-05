@@ -88,6 +88,7 @@ mod tests {
     use super::*;
 
     #[test]
+    #[allow(clippy::zombie_processes)] // the Child is moved into Sidecar, whose Drop reaps it
     fn drop_kills_and_reaps_child() {
         // A stand-in long-lived child; Drop must terminate it.
         let child = Command::new("sleep").arg("60").spawn().expect("spawn sleep");
