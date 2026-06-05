@@ -1468,13 +1468,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "hearsay-app"
-version = "0.1.0"
-dependencies = [
- "hearsay-core",
-]
-
-[[package]]
 name = "hearsay-core"
 version = "0.1.0"
 
@@ -1485,7 +1478,6 @@ dependencies = [
  "crossbeam-channel",
  "env_logger",
  "hearsay-adapters",
- "hearsay-app",
  "hearsay-core",
  "hound",
  "log",

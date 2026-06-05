@@ -8,12 +8,13 @@ license.workspace = true
 
 [dependencies]
 hearsay-core.workspace = true
-hearsay-app.workspace = true
-hearsay-adapters.workspace = true
 crossbeam-channel = "0.5"
 log.workspace = true
 
 [dev-dependencies]
+# Only the e2e example wires concrete adapters; the engine library orchestrates purely
+# through core ports (kept out of [dependencies] so the app layer can't couple to them).
+hearsay-adapters.workspace = true
 hound = "3.5.1"
 env_logger = "0.11"
 

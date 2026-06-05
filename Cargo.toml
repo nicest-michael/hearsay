@@ -2,7 +2,6 @@
 resolver = "2"
 members = [
     "crates/core",
-    "crates/app",
     "crates/adapters",
     "crates/engine",
     "src-tauri",
@@ -12,7 +11,6 @@ members = [
 # built only via the Tauri CLI / `make`, never bare cargo.
 default-members = [
     "crates/core",
-    "crates/app",
     "crates/adapters",
     "crates/engine",
 ]
@@ -26,7 +24,6 @@ authors = ["Michael <michael@nicest.ai>"]
 
 [workspace.dependencies]
 hearsay-core = { path = "crates/core" }
-hearsay-app = { path = "crates/app" }
 hearsay-adapters = { path = "crates/adapters" }
 hearsay-engine = { path = "crates/engine" }
 anyhow = "1"

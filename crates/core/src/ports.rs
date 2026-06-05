@@ -7,7 +7,6 @@ use std::sync::atomic::AtomicBool;
 
 use crate::dialogue::Turn;
 use crate::error::{CaptureError, LlmError, PlaybackError, SynthError, TranscribeError};
-use crate::transcript::TranscriptUpdate;
 use crate::vad::SpeechState;
 use crate::word::Hypothesis;
 
@@ -34,11 +33,6 @@ pub trait AudioSource: Send {
 /// [`Hypothesis`] with timestamps and per-segment confidence.
 pub trait Transcriber: Send {
     fn transcribe(&mut self, audio_16k_mono: &[f32]) -> Result<Hypothesis, TranscribeError>;
-}
-
-/// A driven port: where stabilized transcript deltas are delivered (UI).
-pub trait TranscriptSink: Send {
-    fn emit(&mut self, update: &TranscriptUpdate);
 }
 
 /// A driven port for voice-activity detection. A pure energy impl lives in
