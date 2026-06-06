@@ -114,7 +114,7 @@ impl PlaybackConsumer {
 /// 48 kHz or 44.1 kHz). The TTS output is already band-limited below 12 kHz, so linear
 /// interpolation is artifact-free for this use and far cheaper than a sinc kernel.
 /// Chunk-continuous: carries the last input sample + fractional phase across calls.
-struct Resampler {
+pub(crate) struct Resampler {
     in_rate: u32,
     out_rate: u32,
     step: f64, // input samples advanced per output sample = in/out
@@ -124,7 +124,7 @@ struct Resampler {
 }
 
 impl Resampler {
-    fn new(in_rate: u32, out_rate: u32) -> Self {
+    pub(crate) fn new(in_rate: u32, out_rate: u32) -> Self {
         let in_rate = in_rate.max(1);
         let out_rate = out_rate.max(1);
         Self {
@@ -137,13 +137,13 @@ impl Resampler {
         }
     }
 
-    fn reset(&mut self) {
+    pub(crate) fn reset(&mut self) {
         self.frac = 0.0;
         self.prev = 0.0;
         self.started = false;
     }
 
-    fn process(&mut self, input: &[f32]) -> Vec<f32> {
+    pub(crate) fn process(&mut self, input: &[f32]) -> Vec<f32> {
         if self.in_rate == self.out_rate {
             return input.to_vec();
         }

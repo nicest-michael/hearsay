@@ -35,10 +35,11 @@ A Rust workspace + a Tauri 2 desktop shell. The dependency rule points inward.
   sentence chunker, the pure **`conversation::Dialog` FSM** (Idle/Listening/Thinking/
   Speaking with monotonic turn-ids for race-free barge-in), and the **ports**
   (`AudioSource`, `Transcriber`, `LlmClient`, `SpeechSynthesizer`, `AudioPlayer`).
-- **`crates/adapters`** — the only place external SDKs appear: cpal mic + interruptible
-  cpal playback, `whisper-rs` (Metal), the `mlx_lm.server` SSE client, the TTS
-  Unix-socket client, child-process sidecar lifecycle, and a WAV `FileAudioSource` for
-  headless tests.
+- **`crates/adapters`** — the only place external SDKs appear: the audio I/O (a macOS
+  `VoiceProcessingIO` duplex unit for hardware AEC by default, or separate cpal mic +
+  interruptible cpal playback), `whisper-rs` (Metal), the `mlx_lm.server` SSE client, the
+  TTS Unix-socket client, child-process sidecar lifecycle, and a WAV `FileAudioSource`
+  for headless tests.
 - **`crates/engine`** — the conversation runtime: five threads (capture, inference, llm,
   tts, controller) around the FSM, with the barge-in cancellation wiring.
 - **`src-tauri`** — the desktop shell: Go/Stop, the sidecar lifecycle, and the
@@ -63,8 +64,10 @@ make dev       # opens the Hearsay window (Vite + Tauri, hot reload)
 ```
 
 Click **Go**, grant the microphone prompt, **relaunch** (macOS TCC), click **Go** again, and
-talk. **Wear headphones** so the mic doesn't hear the speakers (v1 has no acoustic echo
-cancellation — barge-in onset is plain VAD; headphones keep it from hearing itself).
+talk — **open-air, no headphones needed**. The mic and speaker share one macOS
+**VoiceProcessingIO** unit, so hardware echo cancellation keeps the mic from hearing the
+agent's own voice and barge-in works over the speakers. (`HEARSAY_NO_AEC=1` falls back to
+a plain mic + headphones.)
 
 First run downloads the Whisper model (~140 MB), Qwen2.5-3B-Instruct-4bit (~1.8 GB), and
 Kokoro (~330 MB).

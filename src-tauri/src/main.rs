@@ -24,7 +24,7 @@ use hearsay_adapters::{
     SidecarTts, WhisperTranscriber, SYNTH_RATE,
 };
 use hearsay_core::config::{ModelChoice, SessionConfig};
-use hearsay_core::ports::AudioSource;
+use hearsay_core::ports::{AudioPlayer, AudioSource};
 use hearsay_core::vad::VadConfig;
 use hearsay_engine::{ConvState, EngineConfig, Ports, TurnRole, UiCommand, UiEvent};
 
@@ -181,25 +181,55 @@ fn start_conversation(app: AppHandle, shared: Arc<Mutex<Shared>>) {
         Err(e) => return fail(&app, &shared, format!("whisper load: {e}")),
     };
 
-    // 4. The rest of the ports.
-    let player = match CpalPlayer::open(SYNTH_RATE) {
-        Ok(p) => p,
-        Err(e) => return fail(&app, &shared, format!("audio output: {e}")),
+    // 4. Audio I/O. By default one macOS VoiceProcessingIO unit does mic + speaker with
+    //    hardware echo cancellation, so the mic doesn't hear the TTS and barge-in works
+    //    open-air. HEARSAY_NO_AEC, or a replay WAV (testing), uses separate cpal streams.
+    let replay = std::env::var("HEARSAY_REPLAY_WAV").ok().filter(|p| !p.is_empty());
+    let no_aec = std::env::var("HEARSAY_NO_AEC").is_ok() || replay.is_some();
+
+    let open_cpal = |app: &AppHandle, shared: &Arc<Mutex<Shared>>| -> Option<Box<dyn AudioPlayer>> {
+        match CpalPlayer::open(SYNTH_RATE) {
+            Ok(p) => Some(Box::new(p)),
+            Err(e) => {
+                fail(app, shared, format!("audio output: {e}"));
+                None
+            }
+        }
     };
-    // The mic, or — for headless GUI testing — a recorded utterance replayed as the mic.
-    let source: Box<dyn AudioSource> = match std::env::var("HEARSAY_REPLAY_WAV") {
-        Ok(path) if !path.is_empty() => match FileAudioSource::from_wav(&path, 1200) {
-            Ok(s) => Box::new(s),
-            Err(e) => return fail(&app, &shared, format!("replay wav: {e}")),
-        },
-        _ => Box::new(CpalMicSource::new(None)),
+
+    let (source, player): (Box<dyn AudioSource>, Box<dyn AudioPlayer>) = if no_aec {
+        let Some(player) = open_cpal(&app, &shared) else {
+            return;
+        };
+        let source: Box<dyn AudioSource> = match &replay {
+            Some(path) => match FileAudioSource::from_wav(path, 1200) {
+                Ok(s) => Box::new(s),
+                Err(e) => return fail(&app, &shared, format!("replay wav: {e}")),
+            },
+            None => Box::new(CpalMicSource::new(None)),
+        };
+        (source, player)
+    } else {
+        match hearsay_adapters::vpio::open() {
+            Ok((s, p)) => (Box::new(s), Box::new(p)),
+            Err(e) => {
+                // AEC unavailable (e.g. mic denied) — fall back to a plain mic + speaker.
+                log::warn!("echo cancellation unavailable, using a plain mic: {e}");
+                emit(&app, "status", "Echo cancellation unavailable — wear headphones.".to_string());
+                let Some(player) = open_cpal(&app, &shared) else {
+                    return;
+                };
+                (Box::new(CpalMicSource::new(None)), player)
+            }
+        }
     };
+
     let ports = Ports {
         source,
         transcriber: Box::new(transcriber),
         llm: Box::new(MlxChat::new(&base, LLM_MODEL)),
         tts: Box::new(tts),
-        player: Box::new(player),
+        player,
     };
     let cfg = EngineConfig {
         mic: None,

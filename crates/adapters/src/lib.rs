@@ -16,6 +16,7 @@ pub mod player;
 pub mod resample;
 pub mod sidecar;
 pub mod tts;
+pub mod vpio;
 pub mod whisper;
 
 pub use file_source::FileAudioSource;
@@ -26,6 +27,7 @@ pub use player::{CpalPlayer, SYNTH_RATE};
 pub use resample::Resampler16k;
 pub use sidecar::{sweep_stale, Sidecar};
 pub use tts::SidecarTts;
+pub use vpio::{VpioPlayer, VpioSource};
 pub use whisper::WhisperTranscriber;
 
 /// Compile-time proof the port impls satisfy the `Send` bound the worker/engine
@@ -35,4 +37,6 @@ const _: () = {
     let _ = assert_send::<CpalMicSource>;
     let _ = assert_send::<WhisperTranscriber>;
     let _ = assert_send::<CpalPlayer>;
+    let _ = assert_send::<VpioSource>;
+    let _ = assert_send::<VpioPlayer>;
 };
