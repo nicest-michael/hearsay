@@ -2,7 +2,7 @@
 //!
 //! Concrete implementations of the `hearsay-core` ports against real I/O:
 //! microphone capture + interruptible playback (cpal), transcription (whisper-rs +
-//! Metal), the local LLM over OpenAI-compatible HTTP, the MisoTTS speech synthesizer
+//! Metal), the local LLM over OpenAI-compatible HTTP, the Kokoro speech synthesizer
 //! over a Unix-domain-socket sidecar, plus model management, a windowed-sinc
 //! resampler, and child-process (sidecar) lifecycle. This crate is the only place
 //! external audio/ML/network crates appear — the dependency rule keeps them out of

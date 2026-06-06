@@ -69,7 +69,7 @@ fn main() -> Result<(), coreaudio::Error> {
             } = args;
             mic_frames.fetch_add(num_frames as u64, Ordering::Relaxed);
             if let Some(ch) = data.channels_mut().next() {
-                let e: f64 = (0..num_frames).map(|i| (ch[i] as f64) * (ch[i] as f64)).sum();
+                let e: f64 = ch.iter().take(num_frames).map(|&v| (v as f64) * (v as f64)).sum();
                 *mic_energy.lock().unwrap() += e;
             }
             Ok(())
@@ -85,9 +85,7 @@ fn main() -> Result<(), coreaudio::Error> {
             } = args;
             render_calls.fetch_add(1, Ordering::Relaxed);
             for ch in data.channels_mut() {
-                for i in 0..num_frames {
-                    ch[i] = 0.0; // silence — just proving the output path runs
-                }
+                ch.iter_mut().take(num_frames).for_each(|s| *s = 0.0); // silence
             }
             Ok(())
         })?;

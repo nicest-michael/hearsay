@@ -26,7 +26,7 @@ use hearsay_core::error::PlaybackError;
 use hearsay_core::ports::AudioPlayer;
 use rtrb::{Consumer, Producer, RingBuffer};
 
-/// The synthesizer's native rate (MisoTTS/Mimi and Kokoro both output 24 kHz).
+/// The synthesizer native rate (Kokoro, Mimi codec, outputs 24 kHz).
 pub const SYNTH_RATE: u32 = 24_000;
 
 /// Wrapper asserting `Send` for the `!Send` CoreAudio stream. Sound because the

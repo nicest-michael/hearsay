@@ -68,7 +68,7 @@ pub trait SpeechSynthesizer: Send {
         cancel: &AtomicBool,
         on_pcm: &mut dyn FnMut(&[f32]),
     ) -> Result<(), SynthError>;
-    /// Native sample rate of the synthesized PCM (MisoTTS/Mimi → 24 kHz).
+    /// Native sample rate of the synthesized PCM (Kokoro/Mimi → 24 kHz).
     fn sample_rate(&self) -> u32;
 }
 

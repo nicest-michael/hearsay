@@ -12,23 +12,19 @@ voice) — *hear / say*.
          └───── barge-in onset ──▶ │ (turn-ids) │ ◀── cancel LLM+TTS+flush playback ─┘
 ```
 
-## The voice: Kokoro by default, Miso optionally
+## The voice: Kokoro
 
-This project was built to talk in the **MisoTTS 8B** "Miso" emotive voice. We measured it
-honestly on this hardware (M5 Pro): MisoTTS 8B runs at **~10× slower than real-time** on
-Apple MPS — its 32-deep sequential RVQ decode per audio frame is kernel-launch-bound on
-Metal (see `docs/adr/0001-architecture.md` and `docs/spike-evidence/`). A reply would lag
-~10× its length, which isn't a conversation.
+The project was *named* for talking in the **MisoTTS 8B** "Miso" emotive voice, but we
+measured it honestly on this hardware (M5 Pro): MisoTTS 8B runs at **~10× slower than
+real-time** on Apple MPS (its 32-deep sequential RVQ decode per frame is kernel-launch-
+bound on Metal) and is a **32 GB** download. A reply would lag ~10× its length — that
+isn't a conversation — so Miso was evaluated and **dropped** (`docs/adr/0001-architecture.md`,
+`docs/spike-evidence/`).
 
-So Hearsay ships **two voices behind one `SpeechSynthesizer` port**:
-
-- **Kokoro 82M** (default) — verified **~0.05× RTF** (20× *faster* than real-time) via
-  `mlx-audio`. This is what makes the conversation real-time and interruptible.
-- **MisoTTS 8B** (optional) — the real emotive Miso voice, available but **not
-  real-time**. Pick it when you want to hear Miso speak and don't mind waiting.
-
-If Miso Labs ships their promised hosted API (110 ms) or a quantized/MLX build, it drops
-in behind the same port with no other changes.
+The voice is **Kokoro 82M** via `mlx-audio` — verified **~0.05× RTF** (20× *faster* than
+real-time), which is what makes the conversation real-time and interruptible. It lives
+behind a `SpeechSynthesizer` port, so if Miso Labs ever ships their promised hosted API
+(110 ms), it drops in there with no other changes.
 
 ## Architecture (hexagonal — forked from `earshot`)
 
@@ -47,7 +43,7 @@ A Rust workspace + a Tauri 2 desktop shell. The dependency rule points inward.
   tts, controller) around the FSM, with the barge-in cancellation wiring.
 - **`src-tauri`** — the desktop shell: Go/Stop, the sidecar lifecycle, and the
   camelCase IPC seam (domain types never cross the wire).
-- **`sidecars/`** — Python model servers (`kokoro_server.py`, `miso_server.py`) speaking
+- **`sidecars/`** — Python model servers (`kokoro_server.py`, `llm_server.py`) speaking
   a small Unix-socket protocol (`sidecars/protocol.md`).
 
 ## Memory: models never stay loaded
@@ -71,7 +67,7 @@ talk. **Wear headphones** so the mic doesn't hear the speakers (v1 has no acoust
 cancellation — barge-in onset is plain VAD; headphones keep it from hearing itself).
 
 First run downloads the Whisper model (~140 MB), Qwen2.5-3B-Instruct-4bit (~1.8 GB), and
-Kokoro (~330 MB). The Miso voice additionally pulls the 32 GB MisoTTS weights on first use.
+Kokoro (~330 MB).
 
 ```bash
 make app       # signed release bundle -> target/release/bundle/macos/Hearsay.app

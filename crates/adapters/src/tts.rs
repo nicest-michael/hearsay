@@ -1,4 +1,4 @@
-//! `SpeechSynthesizer` over a Hearsay TTS sidecar (Kokoro or MisoTTS) speaking the
+//! `SpeechSynthesizer` over the Hearsay Kokoro TTS sidecar speaking the
 //! Unix-domain-socket protocol in `sidecars/protocol.md`.
 //!
 //! The adapter owns one connection. `speak` sends a `speak` request and streams the

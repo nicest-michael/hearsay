@@ -1,6 +1,6 @@
 [package]
 name = "hearsay-adapters"
-description = "Hearsay driven adapters: cpal (mic + playback), whisper-rs (Metal STT), MisoTTS sidecar, mlx LLM, resampler, sidecar lifecycle"
+description = "Hearsay driven adapters: cpal (mic + playback), whisper-rs (Metal STT), Kokoro TTS sidecar, mlx LLM, resampler, sidecar lifecycle"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

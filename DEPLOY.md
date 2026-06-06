@@ -15,15 +15,9 @@ this machine + repo, not portable.
   ```
 
   This runs `npm install` in `web/` and creates `sidecars/.venv` with `mlx-audio`,
-  `mlx-lm`, `misaki[en]`, and `soundfile` (the Kokoro voice + the Qwen LLM).
-
-- **Optional — the Miso voice** (slow, see ADR 0001). Set up the vendored MisoTTS env:
-
-  ```bash
-  git clone https://github.com/MisoLabsAI/MisoTTS.git vendor/MisoTTS
-  git -C vendor/MisoTTS apply ../../vendor-MisoTTS.patch     # ungated tokenizer mirror
-  (cd vendor/MisoTTS && uv sync --python 3.10)
-  ```
+  `mlx-lm`, `misaki[en]`, `en_core_web_sm`, and `soundfile` (the Kokoro voice + the
+  Qwen LLM). `en_core_web_sm` is required at runtime by Kokoro's text processing — without
+  it the TTS sidecar crashes trying to download it.
 
 ## Build
 
@@ -70,7 +64,7 @@ Expected: it transcribes the utterance, prints a `HEARSAY:` reply, writes
 After quitting the app (or 5 minutes idle), no sidecars should remain:
 
 ```bash
-pgrep -fl "kokoro_server|miso_server|llm_server|mlx_lm.server"   # -> nothing
+pgrep -fl "kokoro_server|llm_server|mlx_lm.server"   # -> nothing
 ```
 
 If a hard crash ever leaks one, the next **Go** sweeps it (`sweep_stale`), and each sidecar
@@ -78,5 +72,5 @@ also self-exits when the app process dies.
 
 ## Logs
 
-Sidecar stdout/stderr go to `/tmp/hearsay-{kokoro,miso,llm}.log`. The app logs to the
+Sidecar stdout/stderr go to `/tmp/hearsay-{kokoro,llm}.log`. The app logs to the
 console it was launched from (`RUST_LOG=debug` for more).

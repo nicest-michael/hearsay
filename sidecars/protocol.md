@@ -2,10 +2,9 @@
 
 A Hearsay TTS sidecar is a long-lived process that loads a speech model **once** (warm),
 then serves synthesis over a **Unix domain socket** (path passed as argv[1]). The Rust
-`SidecarTts` adapter is the client. The same protocol is implemented by both backends:
+`SidecarTts` adapter is the client. The protocol is implemented by:
 
-- `kokoro_server.py` — Kokoro 82M via mlx-audio (default, real-time, RTF ~0.05).
-- `miso_server.py`   — MisoTTS 8B via PyTorch/MPS (optional, "highest quality, NOT real-time").
+- `kokoro_server.py` — Kokoro 82M via mlx-audio (real-time, RTF ~0.05).
 
 ## Framing
 

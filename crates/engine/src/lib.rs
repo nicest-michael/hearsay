@@ -1,8 +1,8 @@
 //! # hearsay-engine
 //!
 //! The UI-agnostic runtime: the conversation loop that wires the STT half
-//! (capture → VAD → whisper) to the dialog half (LLM → sentence chunker → MisoTTS/
-//! Kokoro → interruptible playback) around the pure
+//! (capture → VAD → whisper) to the dialog half (LLM → sentence chunker → Kokoro
+//! TTS → interruptible playback) around the pure
 //! [`hearsay_core::conversation::Dialog`] FSM, with barge-in. The desktop shell
 //! (Tauri) is a thin adapter over this.
 

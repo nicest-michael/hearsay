@@ -50,15 +50,6 @@ impl Sidecar {
         spawn_grouped(cmd, repo_root, "kokoro", "kokoro-tts")
     }
 
-    /// Spawn the MisoTTS sidecar (PyTorch/MPS — "highest quality, not real-time").
-    pub fn miso(repo_root: &str, sock: &str, speaker: &str) -> std::io::Result<Self> {
-        let mut cmd = Command::new(format!("{repo_root}/vendor/MisoTTS/.venv/bin/python"));
-        cmd.arg(format!("{repo_root}/sidecars/miso_server.py"))
-            .arg(sock)
-            .arg(speaker);
-        spawn_grouped(cmd, repo_root, "miso", "miso-tts")
-    }
-
     /// Spawn the dialog LLM via the `llm_server.py` watchdog wrapper around
     /// `mlx_lm.server` (OpenAI-compatible on 127.0.0.1:port).
     pub fn mlx_llm(repo_root: &str, model: &str, port: u16) -> std::io::Result<Self> {
@@ -139,7 +130,6 @@ impl Drop for Sidecar {
 pub fn sweep_stale() {
     for pat in [
         "sidecars/kokoro_server.py",
-        "sidecars/miso_server.py",
         "sidecars/llm_server.py",
         "sidecars/.venv/bin/mlx_lm.server",
     ] {
