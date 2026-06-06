@@ -1,0 +1,19 @@
+=== e2e regression after no-mercy+simplify Fri Jun  5 20:09:15 EDT 2026 ===
+[e2e] sweeping stale sidecars + starting fresh ones…
+[e2e] waiting for LLM…
+[e2e] LLM ready in 2s. Warming TTS…
+[e2e] TTS ready. Loading whisper…
+[e2e] running the conversation (replaying /tmp/utter.wav)…
+[e2e]   state -> Idle
+[e2e]   state -> Listening
+[e2e]   YOU: Hey, can you hear me? What should I call you?
+[e2e]   state -> Thinking
+[e2e]   state -> Speaking
+[e2e]   HEARSAY: Call me Hearsay, just shout and I'll do my best to hear you.
+
+===== E2E RESULT =====
+user transcript : "Hey, can you hear me? What should I call you?"
+assistant reply : "Call me Hearsay, just shout and I'll do my best to hear you."
+reply audio     : 102600 samples = 4.28s -> /tmp/hearsay_reply.wav
+VERDICT         : PASS
+=== e2e exit 0 ===
