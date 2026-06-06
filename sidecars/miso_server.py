@@ -158,7 +158,10 @@ def serve_connection(conn, gen, sr):
             if state["shutdown"] and not speak_queue:
                 break
             turn, text = speak_queue.pop(0)
-        cancelled = lambda: state["cancel_through"] >= turn or state["shutdown"]
+
+        def cancelled():
+            return state["cancel_through"] >= turn or state["shutdown"]
+
         try:
             for sentence in split_sentences(text):
                 if cancelled():

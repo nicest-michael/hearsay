@@ -414,7 +414,9 @@ impl Controller {
 
     fn exec(&mut self, e: Effect) {
         match e {
-            Effect::StartLlm { turn, user_text } => {
+            // `user_text` is ignored: it was already appended via the preceding
+            // CommitUser effect, and the job carries the full history below.
+            Effect::StartLlm { turn, user_text: _ } => {
                 self.cur_turn = turn;
                 self.cur_cancel = Arc::new(AtomicBool::new(false));
                 self.assistant_text.clear();
@@ -425,8 +427,6 @@ impl Controller {
                 if let Ok(mut p) = self.player.lock() {
                     p.resume();
                 }
-                // `user_text` is already committed via the preceding CommitUser effect.
-                let _ = user_text;
                 let _ = self.job_tx.send(LlmJob {
                     turn,
                     history: self.conv.turns().to_vec(),

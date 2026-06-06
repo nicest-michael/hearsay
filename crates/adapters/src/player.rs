@@ -125,10 +125,12 @@ struct Resampler {
 
 impl Resampler {
     fn new(in_rate: u32, out_rate: u32) -> Self {
+        let in_rate = in_rate.max(1);
+        let out_rate = out_rate.max(1);
         Self {
-            in_rate: in_rate.max(1),
-            out_rate: out_rate.max(1),
-            step: in_rate.max(1) as f64 / out_rate.max(1) as f64,
+            in_rate,
+            out_rate,
+            step: in_rate as f64 / out_rate as f64,
             frac: 0.0,
             prev: 0.0,
             started: false,

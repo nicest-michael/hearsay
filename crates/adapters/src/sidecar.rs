@@ -33,65 +33,54 @@ pub struct Sidecar {
 impl Sidecar {
     /// Spawn the Kokoro TTS sidecar (mlx-audio) bound to `sock`.
     pub fn kokoro(repo_root: &str, sock: &str, voice: &str) -> std::io::Result<Self> {
-        let child = Command::new(format!("{repo_root}/sidecars/.venv/bin/python"))
-            .arg(format!("{repo_root}/sidecars/kokoro_server.py"))
+        let mut cmd = Command::new(format!("{repo_root}/sidecars/.venv/bin/python"));
+        cmd.arg(format!("{repo_root}/sidecars/kokoro_server.py"))
             .arg(sock)
-            .arg(voice)
-            .process_group(0)
-            .stdout(log_to("kokoro"))
-            .stderr(log_to("kokoro"))
-            .spawn()?;
-        Ok(Self {
-            child,
-            name: "kokoro-tts",
-        })
+            .arg(voice);
+        spawn_grouped(cmd, "kokoro", "kokoro-tts")
     }
 
     /// Spawn the MisoTTS sidecar (PyTorch/MPS — "highest quality, not real-time").
     pub fn miso(repo_root: &str, sock: &str, speaker: &str) -> std::io::Result<Self> {
-        let child = Command::new(format!("{repo_root}/vendor/MisoTTS/.venv/bin/python"))
-            .arg(format!("{repo_root}/sidecars/miso_server.py"))
+        let mut cmd = Command::new(format!("{repo_root}/vendor/MisoTTS/.venv/bin/python"));
+        cmd.arg(format!("{repo_root}/sidecars/miso_server.py"))
             .arg(sock)
-            .arg(speaker)
-            .process_group(0)
-            .stdout(log_to("miso"))
-            .stderr(log_to("miso"))
-            .spawn()?;
-        Ok(Self {
-            child,
-            name: "miso-tts",
-        })
+            .arg(speaker);
+        spawn_grouped(cmd, "miso", "miso-tts")
     }
 
     /// Spawn the dialog LLM via the `llm_server.py` watchdog wrapper around
     /// `mlx_lm.server` (OpenAI-compatible on 127.0.0.1:port).
     pub fn mlx_llm(repo_root: &str, model: &str, port: u16) -> std::io::Result<Self> {
-        let child = Command::new(format!("{repo_root}/sidecars/.venv/bin/python"))
-            .arg(format!("{repo_root}/sidecars/llm_server.py"))
-            .args([
-                "--model",
-                model,
-                "--port",
-                &port.to_string(),
-                "--host",
-                "127.0.0.1",
-                "--log-level",
-                "WARNING",
-            ])
-            .process_group(0)
-            .stdout(log_to("llm"))
-            .stderr(log_to("llm"))
-            .spawn()?;
-        Ok(Self {
-            child,
-            name: "mlx-llm",
-        })
+        let mut cmd = Command::new(format!("{repo_root}/sidecars/.venv/bin/python"));
+        cmd.arg(format!("{repo_root}/sidecars/llm_server.py")).args([
+            "--model",
+            model,
+            "--port",
+            &port.to_string(),
+            "--host",
+            "127.0.0.1",
+            "--log-level",
+            "WARNING",
+        ]);
+        spawn_grouped(cmd, "llm", "mlx-llm")
     }
 
     /// The child's PID (also its process-group id).
     pub fn pid(&self) -> u32 {
         self.child.id()
     }
+}
+
+/// Spawn `cmd` in its own process group with stdout/stderr redirected to the
+/// `/tmp/hearsay-<log>.log` file (never inheriting the parent's fds), tagged `name`.
+fn spawn_grouped(mut cmd: Command, log: &str, name: &'static str) -> std::io::Result<Sidecar> {
+    let child = cmd
+        .process_group(0)
+        .stdout(log_to(log))
+        .stderr(log_to(log))
+        .spawn()?;
+    Ok(Sidecar { child, name })
 }
 
 impl Drop for Sidecar {

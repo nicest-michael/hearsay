@@ -107,30 +107,30 @@ impl SentenceChunker {
                 .find(|&(i, c)| c == ',' && i >= Self::MIN_FIRST)
         };
 
-        let pick = match (term, comma) {
-            (Some(t), Some(c)) => Some(if t.0 <= c.0 { t } else { c }),
-            (Some(t), None) => Some(t),
-            (None, Some(c)) => Some(c),
-            (None, None) => None,
-        };
-
+        // Break at the earliest break point. `term` is listed first, so a terminator
+        // wins a tie with a comma at the same index.
+        let pick = [term, comma].into_iter().flatten().min_by_key(|&(i, _)| i);
         pick.and_then(|(i, ch)| self.take_through(i + ch.len_utf8()))
     }
 
     /// Emit any remaining buffered text as a final chunk (end of stream).
     pub fn flush(&mut self) -> Option<String> {
-        let s = self.buf.trim().to_string();
-        self.buf.clear();
+        let chunk = std::mem::take(&mut self.buf);
         self.first_done = true;
-        (!s.is_empty()).then_some(s)
+        non_empty_trimmed(&chunk)
     }
 
     fn take_through(&mut self, end: usize) -> Option<String> {
         let chunk: String = self.buf.drain(..end).collect();
         self.first_done = true;
-        let s = chunk.trim().to_string();
-        (!s.is_empty()).then_some(s)
+        non_empty_trimmed(&chunk)
     }
+}
+
+/// Trim and return the text, or `None` if nothing is left after trimming.
+fn non_empty_trimmed(s: &str) -> Option<String> {
+    let t = s.trim();
+    (!t.is_empty()).then(|| t.to_string())
 }
 
 #[cfg(test)]

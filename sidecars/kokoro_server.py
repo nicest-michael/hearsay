@@ -70,7 +70,7 @@ def serve_connection(conn, model, sr):
     rf = conn.makefile("rb")
     wf = conn.makefile("wb")
     lock = threading.Lock()
-    state = {"cancel_through": -1, "shutdown": False}
+    state = {"cancel_through": -1, "shutdown": False, "explicit_shutdown": False}
 
     def send_json(obj):
         with lock:
