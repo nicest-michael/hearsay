@@ -14,6 +14,10 @@ thiserror.workspace = true
 cpal = "0.17.3"
 crossbeam-channel = "0.5.15"
 libc = "0.2"
+# Direct access to the VoiceProcessingIO AudioUnit (hardware AEC) — coreaudio-rs is
+# already in the tree transitively via cpal, so this pins the same version.
+coreaudio-rs = { version = "0.14", features = ["audio_unit"] }
+objc2-audio-toolbox = "0.3"
 hound = "3.5.1"
 rtrb = "0.3.4"
 ureq = { version = "3.3.0", features = ["json"] }

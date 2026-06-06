@@ -1453,12 +1453,14 @@ name = "hearsay-adapters"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "coreaudio-rs",
  "cpal",
  "crossbeam-channel",
  "hearsay-core",
  "hound",
  "libc",
  "log",
+ "objc2-audio-toolbox",
  "rtrb",
  "serde",
  "serde_json",
@@ -2274,6 +2276,8 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6948501a91121d6399b79abaa33a8aa4ea7857fe019f341b8c23ad6e81b79b08"
 dependencies = [
  "bitflags 2.12.1",
+ "block2",
+ "dispatch2",
  "libc",
  "objc2",
  "objc2-core-audio",

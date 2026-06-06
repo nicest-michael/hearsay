@@ -24,10 +24,20 @@ fn log_to(name: &str) -> Stdio {
         .unwrap_or_else(|_| Stdio::null())
 }
 
+/// A PATH that includes the usual spots a launched `.app` may be missing — `uv`
+/// (`~/.local/bin`), Homebrew, and `/usr/local` — so a sidecar's own subprocesses
+/// (e.g. spaCy/pip lookups) resolve regardless of how the app was started.
+fn sane_path() -> String {
+    let home = std::env::var("HOME").unwrap_or_default();
+    let inherited = std::env::var("PATH").unwrap_or_default();
+    format!("{home}/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:{inherited}")
+}
+
 /// A model sidecar process owned by the app. Its whole process group is killed on drop.
 pub struct Sidecar {
     child: Child,
     pub name: &'static str,
+    log: &'static str,
 }
 
 impl Sidecar {
@@ -37,7 +47,7 @@ impl Sidecar {
         cmd.arg(format!("{repo_root}/sidecars/kokoro_server.py"))
             .arg(sock)
             .arg(voice);
-        spawn_grouped(cmd, "kokoro", "kokoro-tts")
+        spawn_grouped(cmd, repo_root, "kokoro", "kokoro-tts")
     }
 
     /// Spawn the MisoTTS sidecar (PyTorch/MPS — "highest quality, not real-time").
@@ -46,7 +56,7 @@ impl Sidecar {
         cmd.arg(format!("{repo_root}/sidecars/miso_server.py"))
             .arg(sock)
             .arg(speaker);
-        spawn_grouped(cmd, "miso", "miso-tts")
+        spawn_grouped(cmd, repo_root, "miso", "miso-tts")
     }
 
     /// Spawn the dialog LLM via the `llm_server.py` watchdog wrapper around
@@ -63,24 +73,50 @@ impl Sidecar {
             "--log-level",
             "WARNING",
         ]);
-        spawn_grouped(cmd, "llm", "mlx-llm")
+        spawn_grouped(cmd, repo_root, "llm", "mlx-llm")
     }
 
     /// The child's PID (also its process-group id).
     pub fn pid(&self) -> u32 {
         self.child.id()
     }
+
+    /// True if the process has already exited (crashed/failed) — reaps it if so.
+    pub fn has_exited(&mut self) -> bool {
+        matches!(self.child.try_wait(), Ok(Some(_)))
+    }
+
+    /// The last few lines of this sidecar's log, for surfacing a failure to the user.
+    pub fn log_tail(&self) -> String {
+        let path = format!("/tmp/hearsay-{}.log", self.log);
+        match std::fs::read_to_string(&path) {
+            Ok(s) => {
+                let lines: Vec<&str> = s.lines().collect();
+                let start = lines.len().saturating_sub(8);
+                lines[start..].join("\n")
+            }
+            Err(_) => format!("(no log at {path})"),
+        }
+    }
 }
 
-/// Spawn `cmd` in its own process group with stdout/stderr redirected to the
-/// `/tmp/hearsay-<log>.log` file (never inheriting the parent's fds), tagged `name`.
-fn spawn_grouped(mut cmd: Command, log: &str, name: &'static str) -> std::io::Result<Sidecar> {
+/// Spawn `cmd` in its own process group, with a sane working dir + PATH, and
+/// stdout/stderr redirected to `/tmp/hearsay-<log>.log` (never inheriting the parent's
+/// fds), tagged `name`.
+fn spawn_grouped(
+    mut cmd: Command,
+    repo_root: &str,
+    log: &'static str,
+    name: &'static str,
+) -> std::io::Result<Sidecar> {
     let child = cmd
+        .current_dir(repo_root)
+        .env("PATH", sane_path())
         .process_group(0)
         .stdout(log_to(log))
         .stderr(log_to(log))
         .spawn()?;
-    Ok(Sidecar { child, name })
+    Ok(Sidecar { child, name, log })
 }
 
 impl Drop for Sidecar {
@@ -129,7 +165,11 @@ mod tests {
             .spawn()
             .expect("spawn");
         let pid = child.id();
-        let sc = Sidecar { child, name: "test" };
+        let sc = Sidecar {
+            child,
+            name: "test",
+            log: "test",
+        };
         assert_eq!(sc.pid(), pid);
         drop(sc);
         std::thread::sleep(std::time::Duration::from_millis(150));

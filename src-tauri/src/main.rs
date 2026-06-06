@@ -50,8 +50,8 @@ fn model_dir() -> std::path::PathBuf {
 }
 
 struct Sidecars {
-    _llm: Sidecar,
-    _tts: Sidecar,
+    llm: Sidecar,
+    tts: Sidecar,
 }
 
 struct EngineRun {
@@ -128,29 +128,36 @@ fn start_conversation(app: AppHandle, shared: Arc<Mutex<Shared>>) {
         if g.sidecars.is_none() {
             drop(g);
             sweep_stale();
-            emit(&app, "status", "Starting voice + language models…".to_string());
+            emit(&app, "status", "Starting models… (first Go takes ~15s)".to_string());
             let llm = match Sidecar::mlx_llm(&root, LLM_MODEL, LLM_PORT) {
                 Ok(s) => s,
-                Err(e) => return fail(&app, &shared, format!("failed to start LLM: {e}")),
+                Err(e) => return fail(&app, &shared, format!("Couldn't start the language model: {e}\n{}", SETUP_HINT)),
             };
             let tts = match Sidecar::kokoro(&root, TTS_SOCK, DEFAULT_VOICE) {
                 Ok(s) => s,
-                Err(e) => return fail(&app, &shared, format!("failed to start TTS: {e}")),
+                Err(e) => return fail(&app, &shared, format!("Couldn't start the voice: {e}\n{}", SETUP_HINT)),
             };
-            shared.lock().unwrap().sidecars = Some(Sidecars { _llm: llm, _tts: tts });
+            shared.lock().unwrap().sidecars = Some(Sidecars { llm, tts });
         }
     }
 
-    // 2. Wait for both to be ready.
+    // 2. Wait for both to be ready — bail fast with the sidecar's own log if one crashes,
+    //    instead of hanging on the full timeout.
     let base = format!("http://127.0.0.1:{LLM_PORT}");
-    emit(&app, "status", "Loading language model…".to_string());
-    if !wait_llm_ready(&base, Duration::from_secs(180)) {
-        return fail(&app, &shared, "language model did not become ready".into());
+    let chat = MlxChat::new(&base, LLM_MODEL);
+    if let Err(e) = await_ready(
+        &app,
+        &shared,
+        Which::Llm,
+        "Loading language model",
+        || chat.health(),
+        Duration::from_secs(120),
+    ) {
+        return fail(&app, &shared, e);
     }
-    emit(&app, "status", "Warming up the voice…".to_string());
-    let tts = match connect_tts(TTS_SOCK, Duration::from_secs(120)) {
+    let tts = match await_tts(&app, &shared, Duration::from_secs(90)) {
         Ok(t) => t,
-        Err(e) => return fail(&app, &shared, format!("voice model not ready: {e}")),
+        Err(e) => return fail(&app, &shared, e),
     };
 
     // 3. Speech recognition (downloads the Whisper model on first run).
@@ -229,30 +236,88 @@ fn fail(app: &AppHandle, shared: &Arc<Mutex<Shared>>, msg: String) {
     g.last_active = Some(Instant::now());
 }
 
-fn wait_llm_ready(base: &str, timeout: Duration) -> bool {
-    let chat = MlxChat::new(base, LLM_MODEL);
-    let start = Instant::now();
-    while start.elapsed() < timeout {
-        if chat.health() {
-            return true;
-        }
-        thread::sleep(Duration::from_millis(500));
-    }
-    false
+const SETUP_HINT: &str =
+    "If this is the first run, open the repo in a terminal once and run: make setup";
+
+#[derive(Clone, Copy)]
+enum Which {
+    Llm,
+    Tts,
 }
 
-fn connect_tts(sock: &str, timeout: Duration) -> Result<SidecarTts, String> {
+/// (has the sidecar exited?, the tail of its log). Locks `shared` briefly.
+fn sidecar_status(shared: &Arc<Mutex<Shared>>, which: Which) -> (bool, String) {
+    let mut g = shared.lock().unwrap();
+    match g.sidecars.as_mut() {
+        Some(s) => {
+            let sc = match which {
+                Which::Llm => &mut s.llm,
+                Which::Tts => &mut s.tts,
+            };
+            (sc.has_exited(), sc.log_tail())
+        }
+        None => (true, "(no sidecar running)".to_string()),
+    }
+}
+
+/// Poll `ready` until true, emitting elapsed-time status. Returns a detailed error (with
+/// the sidecar's own log) if the sidecar crashes or the timeout elapses.
+fn await_ready<F: Fn() -> bool>(
+    app: &AppHandle,
+    shared: &Arc<Mutex<Shared>>,
+    which: Which,
+    label: &str,
+    ready: F,
+    timeout: Duration,
+) -> Result<(), String> {
     let start = Instant::now();
     loop {
-        match SidecarTts::connect(sock) {
-            Ok(t) => return Ok(t),
-            Err(e) => {
-                if start.elapsed() >= timeout {
-                    return Err(e.to_string());
-                }
-                thread::sleep(Duration::from_millis(500));
-            }
+        if ready() {
+            return Ok(());
         }
+        let (exited, tail) = sidecar_status(shared, which);
+        if exited {
+            return Err(format!("{label} crashed during startup.\n\n{tail}"));
+        }
+        if start.elapsed() >= timeout {
+            return Err(format!(
+                "{label} didn't come up in {}s.\n\n{tail}",
+                timeout.as_secs()
+            ));
+        }
+        emit(app, "status", format!("{label}… {}s", start.elapsed().as_secs()));
+        thread::sleep(Duration::from_millis(400));
+    }
+}
+
+/// Like [`await_ready`], but the "ready" check is connecting to the TTS socket, and it
+/// returns the live connection.
+fn await_tts(
+    app: &AppHandle,
+    shared: &Arc<Mutex<Shared>>,
+    timeout: Duration,
+) -> Result<SidecarTts, String> {
+    let start = Instant::now();
+    loop {
+        if let Ok(t) = SidecarTts::connect(TTS_SOCK) {
+            return Ok(t);
+        }
+        let (exited, tail) = sidecar_status(shared, Which::Tts);
+        if exited {
+            return Err(format!("The voice model crashed during startup.\n\n{tail}"));
+        }
+        if start.elapsed() >= timeout {
+            return Err(format!(
+                "The voice didn't warm up in {}s.\n\n{tail}",
+                timeout.as_secs()
+            ));
+        }
+        emit(
+            app,
+            "status",
+            format!("Warming up the voice… {}s", start.elapsed().as_secs()),
+        );
+        thread::sleep(Duration::from_millis(400));
     }
 }
 

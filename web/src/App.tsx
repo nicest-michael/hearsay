@@ -138,7 +138,7 @@ export default function App() {
 
         <div className="h-5 text-center text-sm text-neutral-400">
           {error ? (
-            <span className="text-rose-400">{error}</span>
+            <span className="text-rose-400">Something went wrong — details below</span>
           ) : phase === "starting" ? (
             status || "Starting…"
           ) : phase === "running" ? (
@@ -150,6 +150,32 @@ export default function App() {
           )}
         </div>
       </div>
+
+      {/* Error / diagnostics — shows the sidecar's own log so it can be copied to support */}
+      {error && (
+        <div className="mx-5 mb-3 rounded-lg border border-rose-500/30 bg-rose-500/10 p-3">
+          <div className="mb-1.5 flex items-center justify-between">
+            <span className="text-xs font-semibold text-rose-300">Couldn't start</span>
+            <div className="flex gap-3">
+              <button
+                onClick={() => navigator.clipboard.writeText(error)}
+                className="text-[11px] text-rose-300/70 hover:text-rose-200"
+              >
+                Copy
+              </button>
+              <button
+                onClick={() => setError("")}
+                className="text-[11px] text-rose-300/70 hover:text-rose-200"
+              >
+                Dismiss
+              </button>
+            </div>
+          </div>
+          <pre className="max-h-40 overflow-auto whitespace-pre-wrap break-words font-mono text-[11px] leading-snug text-rose-100/80">
+            {error}
+          </pre>
+        </div>
+      )}
 
       {/* Transcript */}
       <div ref={scrollRef} className="flex-1 space-y-3 overflow-y-auto px-5 pb-3">
