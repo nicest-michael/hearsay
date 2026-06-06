@@ -20,10 +20,11 @@ use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager, State, WindowEvent};
 
 use hearsay_adapters::{
-    ensure_model, sweep_stale, CpalMicSource, CpalPlayer, MlxChat, Sidecar, SidecarTts,
-    WhisperTranscriber, SYNTH_RATE,
+    ensure_model, sweep_stale, CpalMicSource, CpalPlayer, FileAudioSource, MlxChat, Sidecar,
+    SidecarTts, WhisperTranscriber, SYNTH_RATE,
 };
 use hearsay_core::config::{ModelChoice, SessionConfig};
+use hearsay_core::ports::AudioSource;
 use hearsay_core::vad::VadConfig;
 use hearsay_engine::{ConvState, EngineConfig, Ports, TurnRole, UiCommand, UiEvent};
 
@@ -90,18 +91,18 @@ fn forward_events(app: AppHandle, evt_rx: crossbeam_channel::Receiver<UiEvent>) 
         match ev {
             UiEvent::Status(s) => emit(&app, "status", s),
             UiEvent::Started => emit(&app, "started", ()),
-            UiEvent::State(cs) => emit(&app, "state", conv_state_str(cs)),
-            UiEvent::Turn { role, text } => emit(
-                &app,
-                "turn",
-                TurnPayload {
-                    role: match role {
-                        TurnRole::User => "user",
-                        TurnRole::Assistant => "assistant",
-                    },
-                    text,
-                },
-            ),
+            UiEvent::State(cs) => {
+                log::info!("[ui] state: {}", conv_state_str(cs));
+                emit(&app, "state", conv_state_str(cs));
+            }
+            UiEvent::Turn { role, text } => {
+                let role = match role {
+                    TurnRole::User => "user",
+                    TurnRole::Assistant => "assistant",
+                };
+                log::info!("[ui] turn {role}: {text}");
+                emit(&app, "turn", TurnPayload { role, text });
+            }
             UiEvent::Level(rms) => emit(&app, "level", rms),
             UiEvent::Error(s) => emit(&app, "error", s),
             UiEvent::Stopped => {
@@ -178,8 +179,16 @@ fn start_conversation(app: AppHandle, shared: Arc<Mutex<Shared>>) {
         Ok(p) => p,
         Err(e) => return fail(&app, &shared, format!("audio output: {e}")),
     };
+    // The mic, or — for headless GUI testing — a recorded utterance replayed as the mic.
+    let source: Box<dyn AudioSource> = match std::env::var("HEARSAY_REPLAY_WAV") {
+        Ok(path) if !path.is_empty() => match FileAudioSource::from_wav(&path, 1200) {
+            Ok(s) => Box::new(s),
+            Err(e) => return fail(&app, &shared, format!("replay wav: {e}")),
+        },
+        _ => Box::new(CpalMicSource::new(None)),
+    };
     let ports = Ports {
-        source: Box::new(CpalMicSource::new(None)),
+        source,
         transcriber: Box::new(transcriber),
         llm: Box::new(MlxChat::new(&base, LLM_MODEL)),
         tts: Box::new(tts),
@@ -256,17 +265,21 @@ fn stop_engine(shared: &Arc<Mutex<Shared>>) {
     shared.lock().unwrap().last_active = Some(Instant::now());
 }
 
-#[tauri::command]
-fn go(app: AppHandle, state: State<'_, AppState>) -> Result<(), String> {
-    let shared = state.0.clone();
+/// Begin a conversation (idempotent — a no-op if one is already starting/running).
+fn begin(app: AppHandle, shared: Arc<Mutex<Shared>>) {
     {
         let mut g = shared.lock().unwrap();
         if g.starting || g.engine.is_some() {
-            return Ok(()); // already going
+            return;
         }
         g.starting = true;
     }
     thread::spawn(move || start_conversation(app, shared));
+}
+
+#[tauri::command]
+fn go(app: AppHandle, state: State<'_, AppState>) -> Result<(), String> {
+    begin(app, state.0.clone());
     Ok(())
 }
 
@@ -302,6 +315,14 @@ fn main() {
         .manage(state)
         .setup(move |app| {
             spawn_idle_unloader(shared.clone(), app.handle().clone());
+            // Headless GUI testing: auto-click Go on launch (pairs with HEARSAY_REPLAY_WAV).
+            if std::env::var("HEARSAY_AUTOGO").is_ok() {
+                let (sh, ah) = (shared.clone(), app.handle().clone());
+                thread::spawn(move || {
+                    thread::sleep(Duration::from_millis(800));
+                    begin(ah, sh);
+                });
+            }
             Ok(())
         })
         .on_window_event(|window, event| {
