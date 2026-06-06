@@ -7,3 +7,4 @@ web/dist/
 *.wav
 .DS_Store
 vendor/
+handoff.md
