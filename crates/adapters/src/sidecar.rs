@@ -109,12 +109,14 @@ impl Drop for Sidecar {
 }
 
 /// Kill any orphaned Hearsay sidecars left by a previous crashed run. Best-effort.
+/// Patterns are Hearsay-specific paths so this never touches an unrelated `mlx_lm.server`
+/// the user might be running for another project.
 pub fn sweep_stale() {
     for pat in [
-        "kokoro_server.py",
-        "miso_server.py",
-        "llm_server.py",
-        "mlx_lm.server",
+        "sidecars/kokoro_server.py",
+        "sidecars/miso_server.py",
+        "sidecars/llm_server.py",
+        "sidecars/.venv/bin/mlx_lm.server",
     ] {
         let _ = Command::new("pkill").args(["-f", pat]).status();
     }

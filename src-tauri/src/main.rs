@@ -214,7 +214,10 @@ fn fail(app: &AppHandle, shared: &Arc<Mutex<Shared>>, msg: String) {
     log::error!("{msg}");
     emit(app, "error", msg);
     emit(app, "stopped", ());
-    shared.lock().unwrap().starting = false;
+    let mut g = shared.lock().unwrap();
+    g.starting = false;
+    // Mark idle so the unloader still reaps any warm sidecars left by a partial start.
+    g.last_active = Some(Instant::now());
 }
 
 fn wait_llm_ready(base: &str, timeout: Duration) -> bool {

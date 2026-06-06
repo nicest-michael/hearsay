@@ -35,6 +35,7 @@ impl AudioPlayer for RecordingPlayer {
         Ok(())
     }
     fn barge_stop(&mut self) {}
+    fn resume(&mut self) {}
     fn played_samples(&self) -> u64 {
         self.samples.lock().unwrap().len() as u64
     }

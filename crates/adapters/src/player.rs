@@ -34,12 +34,27 @@ pub const SYNTH_RATE: u32 = 24_000;
 struct SendStream(#[allow(dead_code)] cpal::Stream);
 unsafe impl Send for SendStream {}
 
-#[derive(Default)]
 struct Shared {
     flush: AtomicBool,
+    /// When false (after a barge-in), `enqueue` drops samples so a late TTS chunk that
+    /// races past `barge_stop` can neither be heard nor latch `is_draining` true.
+    /// `resume` re-arms it at the start of the next turn.
+    live: AtomicBool,
     enqueued: AtomicU64,
     consumed: AtomicU64,
     delivered: AtomicU64,
+}
+
+impl Default for Shared {
+    fn default() -> Self {
+        Self {
+            flush: AtomicBool::new(false),
+            live: AtomicBool::new(true),
+            enqueued: AtomicU64::new(0),
+            consumed: AtomicU64::new(0),
+            delivered: AtomicU64::new(0),
+        }
+    }
 }
 
 /// The cpal-callback side of the ring: pops samples into the device buffer, honoring
@@ -198,6 +213,11 @@ impl CpalPlayer {
 
 impl AudioPlayer for CpalPlayer {
     fn enqueue(&mut self, pcm: &[f32]) -> Result<(), PlaybackError> {
+        // Dropped after a barge-in until the next turn resumes us — closes the race
+        // where a late TTS chunk lands just after barge_stop.
+        if !self.shared.live.load(Ordering::Acquire) {
+            return Ok(());
+        }
         let resampled = self.resampler.process(pcm);
         let mut pushed = 0u64;
         for &s in &resampled {
@@ -218,9 +238,14 @@ impl AudioPlayer for CpalPlayer {
     }
 
     fn barge_stop(&mut self) {
-        // Callback drains + silences on its next tick; reset phase for the next turn.
+        // Stop accepting audio, callback drains + silences on its next tick, reset phase.
+        self.shared.live.store(false, Ordering::Release);
         self.shared.flush.store(true, Ordering::Release);
         self.resampler.reset();
+    }
+
+    fn resume(&mut self) {
+        self.shared.live.store(true, Ordering::Release);
     }
 
     fn played_samples(&self) -> u64 {
@@ -371,6 +396,33 @@ mod tests {
             .map(|(a, b)| (a - b).abs())
             .fold(0.0f32, f32::max);
         assert!(max_diff < 1e-6, "chunk variance: {max_diff}");
+    }
+
+    /// Regression for the barge-in race (no-mercy B1/B2): after `barge_stop`, a late
+    /// `enqueue` must be dropped (not played, not counted) until `resume`.
+    #[test]
+    #[ignore = "requires an audio output device; run with --ignored"]
+    fn enqueue_dropped_after_barge_until_resume() {
+        let mut p = CpalPlayer::open(SYNTH_RATE).expect("open output");
+        let chunk = vec![0.05f32; 2_400];
+        p.enqueue(&chunk).unwrap();
+        let baseline = p.shared.enqueued.load(Ordering::Relaxed);
+        assert!(baseline > 0, "first enqueue should count");
+
+        p.barge_stop();
+        p.enqueue(&chunk).unwrap(); // racing chunk after barge -> must be dropped
+        assert_eq!(
+            p.shared.enqueued.load(Ordering::Relaxed),
+            baseline,
+            "enqueue after barge_stop must be dropped"
+        );
+
+        p.resume();
+        p.enqueue(&chunk).unwrap(); // next turn -> accepted again
+        assert!(
+            p.shared.enqueued.load(Ordering::Relaxed) > baseline,
+            "enqueue must work again after resume"
+        );
     }
 
     /// Manual smoke test: play a 440 Hz tone for ~300 ms on the real device.

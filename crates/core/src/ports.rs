@@ -78,7 +78,11 @@ pub trait SpeechSynthesizer: Send {
 /// reports what actually reached the device (for "how much did they hear").
 pub trait AudioPlayer: Send {
     fn enqueue(&mut self, pcm: &[f32]) -> Result<(), PlaybackError>;
+    /// Flush all pending audio for an instant cut, and stop accepting new audio until
+    /// [`AudioPlayer::resume`] (so a late chunk racing past a barge-in is dropped).
     fn barge_stop(&mut self);
+    /// Re-arm `enqueue` after a `barge_stop`, at the start of a new turn.
+    fn resume(&mut self);
     fn played_samples(&self) -> u64;
     fn is_draining(&self) -> bool;
     /// Sample rate the player expects `enqueue`d PCM to be in.

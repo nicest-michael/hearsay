@@ -135,6 +135,9 @@ fn run(ports: Ports, cfg: EngineConfig, cmd_rx: Receiver<UiCommand>, evt_tx: Sen
     }
 
     stop.store(true, Ordering::Release);
+    // Cancel any in-flight turn so a worker mid-speak()/reply() bails on its next
+    // read-timeout instead of blocking join() on a slow/hung sidecar.
+    ctl.cur_cancel.store(true, Ordering::Release);
     drop(ctl); // drops job_tx/synth_tx -> llm/tts workers exit; capture exit drops infer_tx
     for h in handles {
         let _ = h.join();
@@ -397,6 +400,8 @@ impl Controller {
                 }
             }
         }
+        // Don't let turn completion hinge on the ticker winning the select! race.
+        self.check_drain();
     }
 
     fn event(&mut self, ev: Event) {
@@ -416,6 +421,10 @@ impl Controller {
                 self.llm_done = false;
                 self.pending_synth = 0;
                 self.awaiting_drain = false;
+                // Re-arm the player after any prior barge-in so this turn's audio plays.
+                if let Ok(mut p) = self.player.lock() {
+                    p.resume();
+                }
                 // `user_text` is already committed via the preceding CommitUser effect.
                 let _ = user_text;
                 let _ = self.job_tx.send(LlmJob {
@@ -522,6 +531,7 @@ mod tests {
             s.barge_stops += 1;
             s.consumed = s.enqueued; // flush -> nothing pending
         }
+        fn resume(&mut self) {}
         fn played_samples(&self) -> u64 {
             self.st.lock().unwrap().consumed
         }

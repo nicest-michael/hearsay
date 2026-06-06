@@ -7,13 +7,25 @@
 //! connection stays in sync for the next turn). Playback is flushed engine-side, so the
 //! audible cut is instant regardless of how long the drain takes.
 
-use std::io::{BufRead, BufReader, Read, Write};
+use std::io::{BufRead, BufReader, ErrorKind, Read, Write};
 use std::os::unix::net::UnixStream;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::time::Duration;
 
 use hearsay_core::error::SynthError;
 use hearsay_core::ports::SpeechSynthesizer;
 use serde_json::{json, Value};
+
+/// A silent sidecar for this long is treated as dead, so a hung TTS process can't
+/// block the worker thread (and thus shutdown `join()`) forever.
+const READ_TIMEOUT: Duration = Duration::from_secs(30);
+/// Reject an `audio` header claiming more than this (guards against a bad header
+/// triggering a huge allocation + indefinite read). 30 s of 24 kHz f32 mono.
+const MAX_PCM_BYTES: usize = 24_000 * 4 * 30;
+
+fn is_timeout(e: &std::io::Error) -> bool {
+    matches!(e.kind(), ErrorKind::WouldBlock | ErrorKind::TimedOut)
+}
 
 pub struct SidecarTts {
     reader: BufReader<UnixStream>,
@@ -27,6 +39,9 @@ impl SidecarTts {
     pub fn connect(sock_path: &str) -> Result<Self, SynthError> {
         let stream =
             UnixStream::connect(sock_path).map_err(|e| SynthError::Unreachable(e.to_string()))?;
+        stream
+            .set_read_timeout(Some(READ_TIMEOUT))
+            .map_err(|e| SynthError::Unreachable(e.to_string()))?;
         let writer = stream
             .try_clone()
             .map_err(|e| SynthError::Unreachable(e.to_string()))?;
@@ -83,10 +98,19 @@ impl SpeechSynthesizer for SidecarTts {
         let mut line = String::new();
         loop {
             line.clear();
-            let n = self
-                .reader
-                .read_line(&mut line)
-                .map_err(|e| SynthError::Protocol(e.to_string()))?;
+            let n = match self.reader.read_line(&mut line) {
+                Ok(n) => n,
+                // A read timeout while cancelled is a clean bail; otherwise the sidecar
+                // is hung — fail rather than block the worker (and shutdown) forever.
+                Err(e) if is_timeout(&e) => {
+                    return if cancel.load(Ordering::Relaxed) {
+                        Ok(())
+                    } else {
+                        Err(SynthError::Unreachable("tts read timed out".into()))
+                    };
+                }
+                Err(e) => return Err(SynthError::Protocol(e.to_string())),
+            };
             if n == 0 {
                 return Err(SynthError::Unreachable("sidecar closed connection".into()));
             }
@@ -95,10 +119,17 @@ impl SpeechSynthesizer for SidecarTts {
             match v["type"].as_str() {
                 Some("audio") => {
                     let len = v["bytes"].as_u64().unwrap_or(0) as usize;
+                    if len > MAX_PCM_BYTES {
+                        return Err(SynthError::Protocol(format!("audio chunk too large: {len}")));
+                    }
                     let mut buf = vec![0u8; len];
-                    self.reader
-                        .read_exact(&mut buf)
-                        .map_err(|e| SynthError::Protocol(e.to_string()))?;
+                    if let Err(e) = self.reader.read_exact(&mut buf) {
+                        return if is_timeout(&e) && cancel.load(Ordering::Relaxed) {
+                            Ok(())
+                        } else {
+                            Err(SynthError::Protocol(e.to_string()))
+                        };
+                    }
                     if cancelled {
                         continue; // draining post-cancel
                     }

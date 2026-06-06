@@ -5,11 +5,24 @@
 
 use std::io::{BufRead, BufReader};
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::time::Duration;
 
 use hearsay_core::dialogue::{Role, Turn};
 use hearsay_core::error::LlmError;
 use hearsay_core::ports::LlmClient;
 use serde_json::{json, Value};
+
+/// Bounds a hung LLM server so a stuck streaming read can't pin the worker thread
+/// (and thus block shutdown `join()`). Terse spoken replies finish in seconds; this is
+/// only a backstop for a wedged server.
+const REQUEST_TIMEOUT: Duration = Duration::from_secs(120);
+
+fn agent() -> ureq::Agent {
+    ureq::Agent::config_builder()
+        .timeout_global(Some(REQUEST_TIMEOUT))
+        .build()
+        .into()
+}
 
 pub struct MlxChat {
     base: String, // e.g. http://127.0.0.1:8080
@@ -92,7 +105,8 @@ impl LlmClient for MlxChat {
             "temperature": self.temperature,
         });
 
-        let resp = ureq::post(format!("{}/v1/chat/completions", self.base))
+        let resp = agent()
+            .post(format!("{}/v1/chat/completions", self.base))
             .send_json(&body)
             .map_err(|e| LlmError::Unreachable(e.to_string()))?;
         let mut reader = BufReader::new(resp.into_body().into_reader());
