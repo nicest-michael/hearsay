@@ -128,6 +128,10 @@ fn start_conversation(app: AppHandle, shared: Arc<Mutex<Shared>>) {
         if g.sidecars.is_none() {
             drop(g);
             sweep_stale();
+            // A fast relaunch (or a crash + reopen) can race a dying previous instance
+            // that still holds the LLM port / TTS socket. Wait for them to actually free.
+            wait_port_free(LLM_PORT, Duration::from_secs(6));
+            let _ = std::fs::remove_file(TTS_SOCK);
             emit(&app, "status", "Starting models… (first Go takes ~15s)".to_string());
             let llm = match Sidecar::mlx_llm(&root, LLM_MODEL, LLM_PORT) {
                 Ok(s) => s,
@@ -264,6 +268,18 @@ fn fail(app: &AppHandle, shared: &Arc<Mutex<Shared>>, msg: String) {
     g.starting = false;
     // Mark idle so the unloader still reaps any warm sidecars left by a partial start.
     g.last_active = Some(Instant::now());
+}
+
+/// Block until `port` on 127.0.0.1 can be bound (i.e. is free), or `timeout` elapses.
+/// Used after `sweep_stale` so a freshly-spawned LLM server doesn't race a dying one.
+fn wait_port_free(port: u16, timeout: Duration) {
+    let start = Instant::now();
+    while start.elapsed() < timeout {
+        if std::net::TcpListener::bind(("127.0.0.1", port)).is_ok() {
+            return;
+        }
+        thread::sleep(Duration::from_millis(200));
+    }
 }
 
 const SETUP_HINT: &str =
