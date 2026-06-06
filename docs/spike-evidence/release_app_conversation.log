@@ -1,0 +1,8 @@
+[2026-06-06T00:17:43Z INFO  hearsay_adapters::player] playback started: 48000 Hz, 2 ch (synth 24000 Hz)
+[2026-06-06T00:17:43Z INFO  hearsay_tauri] [ui] state: idle
+[2026-06-06T00:17:43Z INFO  hearsay_tauri] [ui] state: listening
+[2026-06-06T00:17:44Z INFO  hearsay_tauri] [ui] turn user: Hey, can you hear me? What should I call you?
+[2026-06-06T00:17:44Z INFO  hearsay_tauri] [ui] state: thinking
+[2026-06-06T00:17:45Z INFO  hearsay_tauri] [ui] state: speaking
+[2026-06-06T00:17:51Z INFO  hearsay_tauri] [ui] turn assistant: Hey there! You're all set. Call me Hearsay. How are you doing?
+[2026-06-06T00:17:51Z INFO  hearsay_tauri] [ui] state: idle
